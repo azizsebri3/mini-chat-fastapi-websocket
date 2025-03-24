@@ -5,62 +5,182 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Chat</title>
     <style>
-        #container {
-            margin-top: 20px;
+        /* Global Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Container Styles */
+        .chat-container {
+            width: 400px;
+            height: 550px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .chat-header {
+            background-color: #0078d4;
+            color: white;
+            padding: 15px;
+            font-size: 20px;
+            text-align: center;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+
+        /* User List Section */
+        .user-section {
+            padding: 10px;
+            background-color: #f2f2f2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-section select {
+            width: 60%;
+            padding: 5px;
+            border-radius: 5px;
             border: 1px solid #ccc;
+        }
+
+        .user-section button {
+            background-color: #0078d4;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .user-section button:hover {
+            background-color: #005a99;
+        }
+
+        /* Message Container */
+        #container {
             padding: 10px;
             height: 300px;
-            overflow-y: scroll;
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background-color: #fafafa;
+            border-bottom: 1px solid #ccc;
         }
-        #inputText {
-            margin-top: 10px;
+
+        /* Message Styles */
+        .message {
+            padding: 8px 12px;
+            border-radius: 20px;
+            max-width: 75%;
         }
+
+        .message.sender {
+            background-color: #0078d4;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .message.receiver {
+            background-color: #e4e6eb;
+            color: black;
+            align-self: flex-start;
+        }
+
+        /* Input Section */
+        .input-section {
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f2f2f2;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+        .input-section input {
+            width: 80%;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        .input-section button {
+            background-color: #0078d4;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .input-section button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
     </style>
 </head>
 <body>
-    <h1>WebSocket Chat</h1>
+    <div class="chat-container">
+        <div class="chat-header">Chat App</div>
 
-    <!-- Champ pour saisir le nom d'utilisateur -->
-    <label for="username">Enter your username:</label>
-    <input type="text" id="username" placeholder="Your username">
-    <button id="connectButton">Connect</button>
+        <!-- User Section -->
+        <div class="user-section">
+            <input type="text" id="username" placeholder="Enter your username">
+            <button id="connectButton">Connect</button>
+        </div>
 
-    <!-- Sélectionner un utilisateur pour chatter -->
-    <label for="receiver">Select a User to chat with:</label>
-    <select id="receiver">
-        <!-- La liste des utilisateurs sera ajoutée ici dynamiquement -->
-    </select>
+        <div class="user-section">
+            <label for="receiver">Select User:</label>
+            <select id="receiver">
+                <!-- Users will be dynamically added here -->
+            </select>
+        </div>
 
-    <!-- Champ pour taper le message -->
-    <input type="text" id="inputText" placeholder="Type your message...">
-    <button id="submitButton" disabled>Send</button>
+        <!-- Messages -->
+        <div id="container"></div>
 
-    <!-- Zone pour afficher les messages -->
-    <div id="container"></div>
+        <!-- Input Section -->
+        <div class="input-section">
+            <input type="text" id="inputText" placeholder="Type your message..." disabled>
+            <button id="submitButton" disabled>Send</button>
+        </div>
+    </div>
 
     <script>
-        let socket = null;  // WebSocket connection
-        let username = '';  // Le nom d'utilisateur
-        let selectedUser = '';  // L'utilisateur sélectionné pour discuter
+        let socket = null;
+        let username = '';
+        let selectedUser = '';
 
-        // Fonction pour afficher les messages
+        // Function to display messages
         function showMessage(message, sender) {
-            // Vérifier si le message est destiné à l'utilisateur actuel
-            if (sender === selectedUser) {
-                const messageContainer = document.getElementById('container');
-                const messageElement = document.createElement('div');
-                messageElement.textContent = `${sender}: ${message}`;
-                messageContainer.appendChild(messageElement);
-                messageContainer.scrollTop = messageContainer.scrollHeight;  // Scroll vers le bas pour afficher le dernier message
-            }
+            const messageContainer = document.getElementById('container');
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.classList.add(sender === username ? 'sender' : 'receiver');
+            messageElement.textContent = `${message}`;
+            messageContainer.appendChild(messageElement);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
         }
 
-        // Fonction pour mettre à jour la liste des utilisateurs dans le menu déroulant
+        // Update user list
         function updateUserList(users) {
             const receiverSelect = document.getElementById('receiver');
-            receiverSelect.innerHTML = "";  // Vider la liste actuelle
-            
-            // Ajouter un utilisateur à la liste déroulante
+            receiverSelect.innerHTML = "";
             users.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user;
@@ -69,7 +189,7 @@
             });
         }
 
-        // Se connecter au serveur WebSocket avec le nom d'utilisateur
+        // WebSocket connection and event handling
         document.getElementById("connectButton").addEventListener("click", function() {
             username = document.getElementById("username").value;
             if (!username) {
@@ -77,49 +197,43 @@
                 return;
             }
 
-            // Créer une nouvelle connexion WebSocket
             socket = new WebSocket(`ws://127.0.0.1:8000/ws/${username}`);
 
-            // Quand la connexion est établie
             socket.onopen = function() {
                 console.log("Connected to the WebSocket server!");
                 document.getElementById("submitButton").disabled = false;
+                document.getElementById("inputText").disabled = false;
             };
 
-            // Réception des messages du serveur
             socket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
                 if (data.type === "user_list") {
-                    // Mettre à jour la liste des utilisateurs quand elle est envoyée
                     updateUserList(data.users);
+                    
                 } else {
-                    // Afficher le message reçu
-                    const messageData = JSON.parse(event.data);
-                    showMessage(messageData.message, messageData.sender);
+                    showMessage(data.message, data.sender);
                 }
             };
 
-            // Gérer les erreurs WebSocket
             socket.onerror = function(error) {
                 console.log("WebSocket error: ", error);
             };
         });
 
-        // Envoi du message
+        // Send message
         document.getElementById("submitButton").addEventListener("click", function() {
             const inputText = document.getElementById("inputText");
-            selectedUser = document.getElementById("receiver").value;  // Obtenir l'utilisateur sélectionné
+            selectedUser = document.getElementById("receiver").value;
             const message = inputText.value;
-            
-            // Créer l'objet avec le message et l'utilisateur cible
+
             const messageData = JSON.stringify({
                 receiver: selectedUser,
                 message: message
             });
-            
-            // Envoyer au serveur
+
             socket.send(messageData);
-            inputText.value = "";  // Effacer le champ après envoi
+            inputText.value = "";
+            showMessage(message, username); 
         });
     </script>
 </body>
